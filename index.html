@@ -59,10 +59,11 @@
     der Reset-Button in der Kopfzeile braucht. Der Platzhalter-Charakter steht
     stattdessen ausgeschrieben auf der Result-Maske.
 
-  KEINE KAMPFLOGIK. Zahlenblock und Kampflog auf Maske 3 sind hartcodierte
-  Werte aus COMBAT-RULES.md Paragraph 8 (Worked Example). Das Urteil oben und
-  das Floating-Kurzergebnis benutzen einen ausdruecklich als Platzhalter
-  gekennzeichneten Summenvergleich der Fleet Power, keinen Resolver.
+  DIE KAMPFLOGIK LIEGT IN combat.js. Diese Datei rechnet nichts: sie baut aus
+  dem Zustand einen Snapshot, ruft VoidfallCombat.resolve() auf und uebersetzt
+  das Ergebnis in Saetze. Der Resolver kennt umgekehrt weder DOM noch Texte,
+  weshalb er ohne Browser testbar ist (combat.test.html, combat.test.js).
+  Fehlt combat.js, laeuft alles ausser der Ergebnismaske weiter.
 
   SPRACHE. Standard ist Englisch. ?lang=de haengt die deutsche Prosa an;
   fehlende Schluessel fallen auf Englisch zurueck. terms.* bleibt bewusst
@@ -229,28 +230,66 @@
       "r.tieTitle": "Sector abandoned",
       "r.remaining": "Remaining Fleet Power",
       "r.tieHint": "Tie — with Improved Combat Replicators you may deploy 1 Fleet Power and win instead.",
-      "r.verdictNote": "Placeholder verdict from a plain Fleet Power comparison. No combat is resolved.",
+      "r.capitulate": "The Fallen House capitulates: the Invader survived the Approach step, so there are no Salvo steps.",
+      "r.heldByGuns": "No Fleet Power left on either side — the sector holds on its Installations alone.",
+      "r.stalemateHead": "Stalemate",
+      "r.stalemateTitle": "Nobody can strike",
+      "r.stalemateBody": "Both sides still have Fleet Power, but neither has any Initiative, so no Damage is ever dealt. The rulebook does not cover this case.",
       "r.empty": "Nothing entered yet",
       "r.emptyBody": "Go back to the configuration and set up at least one side.",
       "r.logTitle": "Combat log",
-      "r.notice": "Prototype — the two Fleet Power panels and the whole log below are hard-coded from the worked example in COMBAT-RULES.md §8: Invader 4 Corvette Fleet Power with Basic Shields against 3 Voidborn Fleet Power behind 1 Sector Defense. They do not reflect your input.",
+      "r.choiceNote": "Chosen for the Invader: {list}.",
+      "r.choiceBombard": "{n} Bombard Absorption in the Approach step, {m} kept for the Salvo steps",
+      "r.choiceDestroyer": "the Destroyer's once-per-Combat Damage in Salvo step {n}",
+      "r.missing": "combat.js could not be loaded, so no combat is resolved. Everything else keeps working — put the file next to index.html and reload.",
       "r.lost": "{from} → {to} · lost {n} FP",
-      "r.wiped": "{from} → {to} · wiped out"
+      "r.wiped": "{from} → {to} · wiped out",
+      "r.held": "{from} → {to} · unscathed"
     },
     "log": {
-      "approach.sd": "{side}: {n} Sector Defense deals {dmg} Approach Damage.",
-      "approach.abs": "{side} Approach Absorption: {n} — Basic Shields grants Salvo Absorption only.",
-      "approach.res": "{side} recalls {n} Corvette FP. {a} {from} → {to}, {b} {stay}.",
-      "salvo.simultaneous": "Initiative {a} vs {b} — equal, so both sides fire simultaneously.",
-      "salvo.first": "Initiative {a} vs {b} — {side} is higher and fires first.",
-      "salvo.each": "Each side deals {n} Salvo Damage.",
-      "salvo.absorb": "{side} absorbs with Basic Shields ({n} Salvo Absorption, now used up).",
-      "salvo.recall": "{side} recalls {n} FP: {from} → {to}.",
-      "salvo.recallLast": "{side} recalls its last FP: {from} → {to}.",
-      "salvo.recalc": "{side} recalculates Initiative: {n} — still ≥ 1, so it fires back.",
-      "salvo.zero": "{side} Initiative is now {n} — no Damage back.",
-      "res": "{a} {i}, {b} {d}.",
-      "resEnd": "{a} {i}, {b} {d} — combat ends."
+      "a.carrier": "{side}: Carriers deploy {n} Corvette Fleet Power before any Damage falls.",
+      "a.deal": "{side} deals {n} Approach Damage.",
+      "a.none": "{side} deals no Approach Damage.",
+      "a.abs": "{side} absorbs {n} of it ({have} Approach Absorption available), {net} gets through.",
+      "a.absNone": "{side} has no Approach Absorption — all {n} Damage gets through.",
+      "a.recall": "{side} recalls {n} Fleet Power: {from} → {to}.",
+      "a.unscathed": "Neither side takes Damage.",
+      "a.capitulate": "The Invader survived — the Fallen House capitulates immediately.",
+      "s.init": "{side} Initiative: {n}.",
+      "s.override": "Improved Targeting: {side} counts as having the higher Initiative and fires first.",
+      "s.bothOverride": "Both sides have Improved Targeting — the overrides cancel out, so the raw Initiative decides.",
+      "s.first": "{side} is higher ({a} vs {b}) and fires first.",
+      "s.simul": "Initiative {a} vs {b} — equal, so both sides fire simultaneously.",
+      "s.deal": "{side} deals {n} Salvo Damage.",
+      "s.abs": "{side} absorbs {n}, {net} gets through.",
+      "s.recall": "{side} recalls {n} Fleet Power: {from} → {to}.",
+      "s.recalc": "{side} recalculates Initiative: {n}.",
+      "s.noReply": "{side} has no Initiative left and deals nothing back.",
+      "s.res": "{inv} {i}, {def} {d}.",
+      "s.stalemate": "Neither side has any Initiative — no Damage can be dealt and the combat cannot end.",
+      "p.corvette": "Corvette {n}",
+      "p.sentry": "Sentry {n}",
+      "p.sentryDef": "Sentry {n} → 0 as Defender",
+      "p.destroyer": "Destroyer {n}",
+      "p.dreadnought": "Dreadnought {n}",
+      "p.carrier": "Carrier {n}",
+      "p.voidborn": "Voidborn {n}",
+      "p.dreadFlat": "Dreadnought flat +{n}",
+      "p.destFlat": "Destroyer flat +{n}",
+      "p.targeting": "Basic Targeting +{n}",
+      "p.sd": "Sector Defenses {n}",
+      "p.starbase": "Starbases {n}",
+      "p.dsmBasic": "Deep Space Missiles {n}",
+      "p.dsmImproved": "Improved Deep Space Missiles {n}",
+      "p.energy": "Energy Cells +{n}",
+      "p.impDest": "Improved Destroyers {n}",
+      "p.shields": "Shields {n}",
+      "p.dreadAbs": "Dreadnought {n}",
+      "p.carrierAbs": "Carrier {n}",
+      "p.drones": "Autonomous Drones {n}",
+      "p.bombard": "Bombard {n}",
+      "p.torpedoes": "Torpedoes +{n}",
+      "p.destroyerBonus": "Destroyer, once per Combat +{n}"
     }
   },
 
@@ -357,28 +396,49 @@
       "r.tieTitle": "Sektor aufgegeben",
       "r.remaining": "Verbleibende Fleet Power",
       "r.tieHint": "Unentschieden — mit Improved Combat Replicators darfst du 1 Fleet Power einsetzen und gewinnst stattdessen.",
-      "r.verdictNote": "Platzhalter-Urteil aus einem reinen Fleet-Power-Vergleich. Es wird kein Kampf gerechnet.",
+      "r.capitulate": "Das Fallen House kapituliert: Der Angreifer hat den Approach Step überstanden, deshalb gibt es keine Salvo Steps.",
+      "r.heldByGuns": "Auf keiner Seite bleibt Fleet Power übrig — der Sektor hält sich allein durch seine Installationen.",
+      "r.stalemateHead": "Patt",
+      "r.stalemateTitle": "Niemand kann zuschlagen",
+      "r.stalemateBody": "Beide Seiten haben noch Fleet Power, aber keine Initiative — es wird nie Schaden ausgeteilt. Das Regelwerk deckt diesen Fall nicht ab.",
       "r.empty": "Noch nichts eingetragen",
       "r.emptyBody": "Geh zurück in die Aufstellung und richte mindestens eine Seite ein.",
       "r.logTitle": "Kampflog",
-      "r.notice": "Prototyp — die beiden Fleet-Power-Felder und das gesamte Log darunter sind hartcodiert aus dem Worked Example in COMBAT-RULES.md §8: Angreifer mit 4 Corvette Fleet Power und Basic Shields gegen 3 Voidborn Fleet Power hinter 1 Sector Defense. Sie haben nichts mit deiner Eingabe zu tun.",
+      "r.choiceNote": "Für den Angreifer gewählt: {list}.",
+      "r.choiceBombard": "{n} Bombard-Absorption im Approach Step, {m} für die Salvo Steps aufgehoben",
+      "r.choiceDestroyer": "der einmalige Destroyer-Schaden in Salvo Step {n}",
+      "r.missing": "combat.js konnte nicht geladen werden, deshalb wird kein Kampf gerechnet. Alles andere funktioniert weiter — leg die Datei neben index.html und lade neu.",
       "r.lost": "{from} → {to} · {n} FP verloren",
-      "r.wiped": "{from} → {to} · ausgelöscht"
+      "r.wiped": "{from} → {to} · ausgelöscht",
+      "r.held": "{from} → {to} · ohne Verlust"
     },
     "log": {
-      "approach.sd": "{side}: {n} Sector Defense teilt {dmg} Approach Damage aus.",
-      "approach.abs": "{side} Approach Absorption: {n} — Basic Shields gibt nur Salvo Absorption.",
-      "approach.res": "{side} zieht {n} Corvette FP ab. {a} {from} → {to}, {b} {stay}.",
-      "salvo.simultaneous": "Initiative {a} zu {b} — gleich, also feuern beide Seiten gleichzeitig.",
-      "salvo.first": "Initiative {a} zu {b} — {side} liegt höher und feuert zuerst.",
-      "salvo.each": "Jede Seite teilt {n} Salvo Damage aus.",
-      "salvo.absorb": "{side} absorbiert mit Basic Shields ({n} Salvo Absorption, jetzt aufgebraucht).",
-      "salvo.recall": "{side} zieht {n} FP ab: {from} → {to}.",
-      "salvo.recallLast": "{side} zieht die letzte FP ab: {from} → {to}.",
-      "salvo.recalc": "{side} rechnet die Initiative neu: {n} — weiterhin ≥ 1, also wird zurückgefeuert.",
-      "salvo.zero": "{side} hat jetzt Initiative {n} — kein Schaden zurück.",
-      "res": "{a} {i}, {b} {d}.",
-      "resEnd": "{a} {i}, {b} {d} — der Kampf endet."
+      "a.carrier": "{side}: Carrier setzen {n} Corvette Fleet Power ab, bevor Schaden fällt.",
+      "a.deal": "{side} teilt {n} Approach Damage aus.",
+      "a.none": "{side} teilt keinen Approach Damage aus.",
+      "a.abs": "{side} absorbiert davon {n} ({have} Approach Absorption verfügbar), {net} Damage kommt durch.",
+      "a.absNone": "{side} hat keine Approach Absorption — {n} Damage kommt durch.",
+      "a.recall": "{side} zieht {n} Fleet Power ab: {from} → {to}.",
+      "a.unscathed": "Keine Seite nimmt Schaden.",
+      "a.capitulate": "Der Angreifer hat überlebt — das Fallen House kapituliert sofort.",
+      "s.init": "Initiative {side}: {n}.",
+      "s.override": "Improved Targeting: {side} gilt als höher und feuert zuerst.",
+      "s.bothOverride": "Beide Seiten haben Improved Targeting — die Overrides heben sich auf, es entscheidet die rohe Initiative.",
+      "s.first": "{side} liegt höher ({a} zu {b}) und feuert zuerst.",
+      "s.simul": "Initiative {a} zu {b} — gleich, also feuern beide Seiten gleichzeitig.",
+      "s.deal": "{side} teilt {n} Salvo Damage aus.",
+      "s.abs": "{side} absorbiert {n}, {net} Damage kommt durch.",
+      "s.recall": "{side} zieht {n} Fleet Power ab: {from} → {to}.",
+      "s.recalc": "{side} rechnet die Initiative neu: {n}.",
+      "s.noReply": "{side} hat keine Initiative mehr und feuert nicht zurück.",
+      "s.res": "{inv} {i}, {def} {d}.",
+      "s.stalemate": "Keine Seite hat Initiative — es kann kein Schaden ausgeteilt werden und der Kampf endet nie.",
+      "p.sentryDef": "Sentry {n} → als Verteidiger 0",
+      "p.dreadFlat": "Dreadnought pauschal +{n}",
+      "p.destFlat": "Destroyer pauschal +{n}",
+      "p.dsmBasic": "Deep Space Missiles {n}",
+      "p.impDest": "Improved Destroyers {n}",
+      "p.destroyerBonus": "Destroyer, einmal im Kampf +{n}"
     }
   }
 }
@@ -791,11 +851,15 @@ details.adv[open] summary::before{transform:rotate(90deg)}
 .step[open] .chev{transform:rotate(90deg)}
 .step .body{padding:var(--sp-3);border-top:1px solid var(--line-soft)}
 .calc{display:flex;flex-direction:column;gap:var(--sp-2)}
-.line{display:flex;align-items:flex-start;gap:var(--sp-2);font-size:var(--fs-small);line-height:var(--lh-normal)}
+.line{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--sp-2);font-size:var(--fs-small);line-height:var(--lh-normal)}
 .line .pip{width:8px;height:8px;border-radius:2px;flex:none;margin-top:6px}
 .line .pip.dmg{background:var(--damage)} .line .pip.abs{background:var(--absorb-hi)}
 .line .pip.ini{background:var(--initiative)} .line .pip.res{background:var(--accent)}
 .line span{flex:1;color:var(--text-2)} .line b{color:var(--text-1);font-family:var(--font-num)}
+/* Die Aufschluesselung einer Zeile: woraus sich die Zahl zusammensetzt. Sie
+   haengt unter dem Satz, eingerueckt auf dessen Textkante, und ist bewusst
+   leiser gesetzt — man liest sie nur, wenn man der Zahl nachgeht.          */
+.line .src{flex:0 0 100%;margin-left:16px;color:var(--text-3);font-size:var(--fs-micro)}
 
 /* ===== Reset-Rueckfrage ================================================== */
 .scrim{position:fixed;inset:0;z-index:60;background:var(--scrim);backdrop-filter:blur(4px);
@@ -900,6 +964,26 @@ details.adv[open] summary::before{transform:rotate(90deg)}
     </div>
   </div>
 </div>
+
+<!-- ===========================================================================
+     DIE KAMPFLOGIK LIEGT DANEBEN
+     ---------------------------------------------------------------------------
+     combat.js enthaelt den kompletten Resolver und sonst nichts: kein DOM,
+     keine Texte, keine Farben. Diese Datei ruft ihn nur auf. Der Grund ist
+     Wartbarkeit — ein Rechenfehler laesst sich dort beheben, ohne die UI
+     ueberhaupt zu oeffnen, und der Resolver ist ohne Browser testbar
+     (combat.test.html per Doppelklick oder `node combat.test.js`).
+
+     Klassisches src, kein type="module": ueber file:// blockiert die
+     Same-Origin-Policy den Modul-Import, genau wie fetch().
+
+     Fehlt die Datei, laeuft die App trotzdem: Profile, Kampftyp und
+     Aufstellung funktionieren unveraendert, nur die Ergebnismaske sagt statt
+     Zahlen, dass das Rechenmodul fehlt. Dass hier keine zweite, eigene
+     Rechenlogik als Notnagel steht, ist Absicht — zwei Implementierungen
+     derselben Regeln driften garantiert auseinander.
+     ======================================================================== -->
+<script src="combat.js"></script>
 
 <script>
 "use strict";
@@ -1716,26 +1800,67 @@ function advanced(role){
 }
 
 /* ===========================================================================
-   10 — FLOATING-KURZERGEBNIS  (Platzhalter, KEIN Resolver)
-   Bewusst simpler Summenvergleich der Fleet Power. Er kennt weder Sector
-   Defenses noch Initiative noch Absorption.
+   10 — DER RESOLVER
+   Die Bruecke zu combat.js. Hier steht bewusst keine einzige Regel, sondern
+   nur die Uebersetzung zwischen dem Zustand dieser Maske und der Eingabeform
+   des Resolvers.
+
+   snapshot() reicht ausdruecklich nicht S selbst weiter, sondern baut ein
+   flaches Objekt aus zwei Seiten. Damit haengt combat.js nicht am Slot- und
+   Rollenmodell dieser Datei: die UI darf sich umbauen, solange snapshot()
+   dasselbe liefert.
+
+   Das Ergebnis wird gecached, weil bump() bei jedem Tap laeuft und die
+   Ergebnismaske live mitrechnet. Der Cache-Schluessel ist der Snapshot selbst.
    ======================================================================== */
-function placeholderVerdict(){
-  if(!S.combatType) return {kind:"na"};
-  const i = totalFP("inv"), d = totalFP("def");
-  if(i === 0 && d === 0) return {kind:"na"};
-  if(i > d) return {kind:"inv", diff:i-d};
-  if(d > i) return {kind:"def", diff:d-i};
-  return {kind:"tie", diff:0};
+function snapshot(){
+  const side = role => {
+    const d = D(role);
+    return {
+      corvette:d.corvette, sentry:d.sentry, destroyer:d.destroyer,
+      dreadnought:d.dreadnought, carrier:d.carrier, voidborn:d.voidborn,
+      sectorDefenses:d.sectorDefenses, starbases:d.starbases,
+      tech:Object.assign({}, d.tech),
+      dsmEnergy:d.dsmEnergy, dsmAdjacent:d.dsmAdjacent,
+      returnTrade:d.returnTrade, bombard:d.bombard
+    };
+  };
+  return {combatType:S.combatType, inv:side("inv"), def:side("def")};
 }
+
+let lastKey = null, lastResult = null;
+function combatResult(){
+  if(!window.VoidfallCombat) return {ok:false, outcome:"missing"};
+  const snap = snapshot();
+  const key  = JSON.stringify(snap);
+  if(key !== lastKey){ lastKey = key; lastResult = window.VoidfallCombat.resolve(snap); }
+  return lastResult;
+}
+
+/* ===========================================================================
+   10b — FLOATING-KURZERGEBNIS
+   Nur die zwei Zahlen, die man waehrend der Eingabe wissen will: wer gewinnt
+   und mit wie viel Fleet Power. Die Aufschluesselung steht auf Maske 3.
+   ======================================================================== */
 function bump(){
-  const v = placeholderVerdict();
+  const r = combatResult();
   const who = $("#miniWho"), fp = $("#miniFp"), unitLbl = $("#miniUnit");
-  who.className = "who " + (v.kind === "inv" ? "inv" : v.kind === "def" ? "def" : v.kind === "tie" ? "tie" : "na");
-  if(v.kind === "na"){ who.textContent = "—"; fp.textContent = "–"; unitLbl.textContent = t("terms.fp"); }
-  else if(v.kind === "tie"){ who.textContent = t("ui.mini.tie"); fp.textContent = "0"; unitLbl.textContent = t("terms.fp"); }
-  else { who.textContent = t(v.kind === "inv" ? "terms.invader" : "terms.defender");
-         fp.textContent = "+" + v.diff; unitLbl.textContent = t("terms.fp"); }
+  unitLbl.textContent = t("terms.fp");
+
+  if(!r.ok){
+    who.className = "who na";
+    who.textContent = "—";
+    fp.textContent  = "–";
+  } else if(r.outcome === "tie" || r.outcome === "stalemate"){
+    who.className = "who tie";
+    who.textContent = t(r.outcome === "tie" ? "ui.mini.tie" : "ui.r.stalemateHead");
+    fp.textContent  = r.outcome === "tie" ? "0" : String(r.inv.end);
+  } else {
+    const inv = r.outcome === "invader";
+    who.className = "who " + (inv ? "inv" : "def");
+    who.textContent = t(inv ? "terms.invader" : "terms.defender");
+    fp.textContent  = String(inv ? r.inv.end : r.def.end);
+  }
   $("#mini").setAttribute("aria-label", t("ui.mini.aria"));
   const m = $("#mini"); m.classList.remove("pulse"); void m.offsetWidth; m.classList.add("pulse");
   if(S.screen === 3) renderResult();
@@ -1746,99 +1871,142 @@ function bump(){
    Zweigeteilt: Ergebnis oben, Kampflog darunter, Back + Reset unter beiden
    Bloecken. Alle Log-Steps per Default aufgeklappt.
 
-   Zahlenblock und Log sind hartcodiert aus COMBAT-RULES.md §8. Das Urteil
-   oben folgt dem Platzhalter-Summenvergleich, damit der Unentschieden-
-   Hinweis ueberhaupt sichtbar werden kann — beides ist als Platzhalter
-   ausgeschildert.
+   Alles hier kommt aus combat.js. Diese Datei rechnet nichts nach, sie
+   uebersetzt nur: @inv und @def werden zu Seitennamen, Zahlen werden fett,
+   Schluessel werden Saetze. Steht in einer Log-Zeile eine Zahl, die falsch
+   aussieht, liegt der Fehler in combat.js — nicht hier.
    ======================================================================== */
-const LOG = [
-  {name:["terms.approachStep",{}], inv:"4→3", def:"3→3", lines:[
-    {pip:"dmg", key:"log.approach.sd",  p:{side:"@def", n:"<b>1</b>", dmg:"<b>1</b>"}},
-    {pip:"abs", key:"log.approach.abs", p:{side:"@inv", n:"<b>0</b>"}},
-    {pip:"res", key:"log.approach.res", p:{side:"@inv", n:"<b>1</b>", a:"@inv", from:"<b>4</b>", to:"<b>3</b>", b:"@def", stay:"<b>3</b>"}}
-  ]},
-  {name:["terms.salvoStep",{n:1}], inv:"3→3", def:"3→2", lines:[
-    {pip:"ini", key:"log.salvo.simultaneous", p:{a:"<b>3</b>", b:"<b>3</b>"}},
-    {pip:"dmg", key:"log.salvo.each",   p:{n:"<b>1</b>"}},
-    {pip:"abs", key:"log.salvo.absorb", p:{side:"@inv", n:"<b>1</b>"}},
-    {pip:"res", key:"log.res",          p:{a:"@inv", i:"<b>3</b>", b:"@def", d:"<b>3 → 2</b>"}}
-  ]},
-  {name:["terms.salvoStep",{n:2}], inv:"3→2", def:"2→1", lines:[
-    {pip:"ini", key:"log.salvo.first",  p:{a:"<b>3</b>", b:"<b>2</b>", side:"@inv"}},
-    {pip:"dmg", key:"log.salvo.recall", p:{side:"@def", n:"<b>1</b>", from:"<b>2</b>", to:"<b>1</b>"}},
-    {pip:"ini", key:"log.salvo.recalc", p:{side:"@def", n:"<b>1</b>"}},
-    {pip:"res", key:"log.res",          p:{a:"@inv", i:"<b>3 → 2</b>", b:"@def", d:"<b>1</b>"}}
-  ]},
-  {name:["terms.salvoStep",{n:3}], inv:"2→2", def:"1→0", lines:[
-    {pip:"ini", key:"log.salvo.first",      p:{a:"<b>2</b>", b:"<b>1</b>", side:"@inv"}},
-    {pip:"dmg", key:"log.salvo.recallLast", p:{side:"@def", from:"<b>1</b>", to:"<b>0</b>"}},
-    {pip:"ini", key:"log.salvo.zero",       p:{side:"@def", n:"<b>0</b>"}},
-    {pip:"res", key:"log.resEnd",           p:{a:"@inv", i:"<b>2</b>", b:"@def", d:"<b>0</b>"}}
-  ]}
-];
+
+/* Platzhalter fuellen. Die Rohwerte kommen als Zahlen aus dem Resolver; fett
+   gesetzt wird erst hier, damit combat.js kein Markup kennt.               */
 function fill(p){
   const out = {};
   for(const k in p){
     const v = p[k];
-    out[k] = v === "@inv" ? t("terms.invader") : v === "@def" ? t("terms.defender") : v;
+    out[k] = v === "@inv" ? t("terms.invader")
+           : v === "@def" ? t("terms.defender")
+           : typeof v === "number" ? `<b>${v}</b>`
+           : v;
   }
   return out;
+}
+/* Die Aufschluesselung unter einer Zeile: "Corvette 3 · Dreadnought 2 · …" */
+function fillParts(parts){
+  return parts.map(p => t(p.key, fill(p.p))).join(" · ");
 }
 
 function renderResult(){
   const box = $("#resultBox");
   box.innerHTML = "";
-  const v = placeholderVerdict();
+  const r = combatResult();
 
-  /* --- Urteil --- */
-  const verdict = el("div","verdict " + (v.kind === "tie" ? "tie" : v.kind === "na" ? "na" : "win"));
-  if(v.kind === "na"){
+  /* --- Fehlt combat.js, bleibt der Rest der App benutzbar --------------- */
+  if(r.outcome === "missing"){
+    const v = el("div","verdict na");
+    v.append(el("div","who", t("ui.r.title")));
+    v.append(el("h2", null, "—"));
+    v.append(el("div","rem", t("ui.r.missing")));
+    box.append(v);
+    box.append(navPair());
+    return;
+  }
+
+  const empty = !r.ok;
+  const kind  = empty ? "na"
+              : r.outcome === "tie" ? "tie"
+              : r.outcome === "stalemate" ? "tie"
+              : "win";
+
+  /* --- Urteil ---------------------------------------------------------- */
+  const verdict = el("div","verdict " + kind);
+  if(empty){
     verdict.append(el("div","who", t("ui.r.empty")));
     verdict.append(el("h2", null, "—"));
     verdict.append(el("div","rem", t("ui.r.emptyBody")));
-  } else if(v.kind === "tie"){
+  } else if(r.outcome === "tie"){
     verdict.append(el("div","who", t("ui.r.tieHead")));
     verdict.append(el("h2", null, t("ui.r.tieTitle")));
     verdict.append(el("div","rem", `${t("ui.r.remaining")} <b>0</b> ${t("terms.fp")}`));
+  } else if(r.outcome === "stalemate"){
+    verdict.append(el("div","who", t("ui.r.stalemateHead")));
+    verdict.append(el("h2", null, t("ui.r.stalemateTitle")));
+    verdict.append(el("div","rem", t("ui.r.stalemateBody")));
   } else {
-    const side = v.kind === "inv" ? t("terms.invader") : t("terms.defender");
+    const inv  = r.outcome === "invader";
+    const side = t(inv ? "terms.invader" : "terms.defender");
+    const rest = inv ? r.inv.end : r.def.end;
     verdict.append(el("div","who", t("ui.r.victory",{side})));
-    verdict.append(el("h2", null, t(v.kind === "inv" ? "ui.r.sectorTaken" : "ui.r.sectorHeld")));
-    verdict.append(el("div","rem", `${t("ui.r.remaining")} <b>${v.diff}</b> ${t("terms.fp")}`));
+    verdict.append(el("h2", null, t(inv ? "ui.r.sectorTaken" : "ui.r.sectorHeld")));
+    /* Ein Sieg mit 0 Fleet Power ist kein Widerspruch, sondern §5.1: im Sektor
+       standen nur Sector Defenses oder Starbases. "Verbleibende Fleet Power 0"
+       waere hier zwar richtig, aber irrefuehrend.                           */
+    if(rest === 0) verdict.append(el("div","rem", t("ui.r.heldByGuns")));
+    else           verdict.append(el("div","rem", `${t("ui.r.remaining")} <b>${rest}</b> ${t("terms.fp")}`));
   }
-  verdict.append(el("p","pnote", t("ui.r.verdictNote")));
+  /* Die Kapitulation ist kein normaler Sieg — sie ueberspringt die Salvo
+     Steps und verdient deshalb einen eigenen Satz.                        */
+  if(!empty && S.combatType === "fallen" && r.outcome === "invader"){
+    verdict.append(el("p","pnote", t("ui.r.capitulate")));
+  }
   box.append(verdict);
 
-  /* --- Unentschieden-Hinweis --- */
-  if(v.kind === "tie"){
+  /* --- Unentschieden-Hinweis ------------------------------------------- */
+  if(!empty && r.tieBreakable){
     box.append(el("div","tiehint", icon("i-tie") + "<span>" + t("ui.r.tieHint") + "</span>"));
   }
 
-  /* --- hartcodierter Zahlenblock aus §8 --- */
+  if(empty){ box.append(navPair()); return; }
+
+  /* --- Zahlenblock ------------------------------------------------------ */
+  const barText = s =>
+      s.end === 0        ? t("ui.r.wiped", {from:s.start, to:s.end})
+    : s.end === s.start  ? t("ui.r.held",  {from:s.start, to:s.end})
+    :                      t("ui.r.lost",  {from:s.start, to:s.end, n:s.start - s.end});
+
   const bars = el("div","fpbars");
   bars.append(el("div","fpbar inv",
-    `<span class="lbl">${t("terms.invader")}</span><div class="v">2</div>
-     <div class="d">${t("ui.r.lost",{from:4,to:2,n:2})}</div>`));
+    `<span class="lbl">${t("terms.invader")}</span><div class="v">${r.inv.end}</div>
+     <div class="d">${barText(r.inv)}</div>`));
   bars.append(el("div","fpbar def",
-    `<span class="lbl">${t("terms.defender")}</span><div class="v">0</div>
-     <div class="d">${t("ui.r.wiped",{from:3,to:0})}</div>`));
+    `<span class="lbl">${t("terms.defender")}</span><div class="v">${r.def.end}</div>
+     <div class="d">${barText(r.def)}</div>`));
   box.append(bars);
-  box.append(el("p","notice", t("ui.r.notice")));
+
+  /* --- Was der Resolver fuer den Angreifer entschieden hat --------------
+     Bombard-Split und Destroyer-Timing fragt die Aufstellung bewusst nicht
+     ab, der Resolver sucht die beste Variante. Was er gewaehlt hat, gehoert
+     ausgeschrieben — sonst steht am Tisch eine Zahl, die niemand erklaeren
+     kann.                                                                 */
+  const picks = [];
+  const c = r.choices;
+  if(c.bombardApproach + c.bombardSalvo > 0){
+    picks.push(t("ui.r.choiceBombard", {n:c.bombardApproach, m:c.bombardSalvo}));
+  }
+  if(c.destroyerStep > 0){
+    picks.push(t("ui.r.choiceDestroyer", {n:c.destroyerStep}));
+  }
+  if(picks.length){
+    box.append(el("p","notice", t("ui.r.choiceNote", {list: picks.join(", ")})));
+  }
   box.append(navPair());
 
-  /* --- Kampflog, alle Steps aufgeklappt --- */
+  /* --- Kampflog, alle Steps aufgeklappt --------------------------------- */
   const log = el("div","log");
   log.append(el("h3", null, t("ui.r.logTitle")));
-  LOG.forEach(step => {
+  r.steps.forEach(step => {
     const d = el("details","step");
     d.setAttribute("open","");
     d.append(el("summary", null,
-      `<span class="chev">›</span><span class="sname">${t(step.name[0], step.name[1])}</span>
-       <span class="sfp"><span class="i">${step.inv}</span><span class="sep">·</span><span class="d">${step.def}</span></span>`));
+      `<span class="chev">›</span><span class="sname">${t(step.nameKey, step.nameParams)}</span>
+       <span class="sfp"><span class="i">${step.invFrom}→${step.invTo}</span><span class="sep">·</span><span class="d">${step.defFrom}→${step.defTo}</span></span>`));
     const body = el("div","body");
     const calc = el("div","calc");
-    step.lines.forEach(l => calc.append(el("div","line",
-      `<i class="pip ${l.pip}"></i><span>${t(l.key, fill(l.p))}</span>`)));
+    step.lines.forEach(l => {
+      const row = el("div","line",
+        `<i class="pip ${l.pip}"></i><span>${t(l.key, fill(l.p))}</span>`);
+      if(l.parts) row.append(el("span","src", fillParts(l.parts)));
+      calc.append(row);
+    });
     body.append(calc);
     d.append(body);
     log.append(d);
