@@ -1,0 +1,36 @@
+In diesem Seitenchat habe ich keine Werkzeuge — ausführen kann ich es hier nicht. Im Hauptchat schon. Was ich dir hier gebe, ist der Plan und die vier Entscheidungen, die ich dafür von dir brauche.
+
+Was ich zuerst prüfen müsste
+git ist so gut wie sicher da — meine Bash-Werkzeuge laufen ohnehin in Git Bash. Offen ist, ob die GitHub CLI (gh) installiert und angemeldet ist. Mit ihr ist es ein Befehl:
+
+gh repo create voidfall-helper --private --source=. --push
+Ohne sie legst du das Repository von Hand auf github.com an und ich hänge es als Remote dran — dann brauchst du einmal ein Token oder den Windows-Anmeldeinformationsspeicher.
+
+Zwei Dinge, die ich vorher auf den Tisch legen will
+Git in OneDrive ist heikel. Das Projekt liegt unter H:\OneDrive\.... OneDrive synchronisiert dann auch .git/ mit — bei zwei Rechnern oder „Dateien bei Bedarf" kann das die Objektdatenbank beschädigen. Es geht bei den meisten gut, aber sobald GitHub deine Sicherung ist, ist OneDrive für dieses Verzeichnis ohnehin überflüssig. Ich würde das Projekt mittelfristig nach H:\Projekte\Voidfall-Helper verschieben. Kein Blocker für heute.
+
+Öffentlich oder privat hat eine Konsequenz für das Hosting. COMBAT-RULES.md und Briefing.md sind eine ziemlich vollständige Aufbereitung der Voidfall-Regeln — das ist fremdes Material, und in einem öffentlichen Repository würde ich es nicht ablegen. Nur: GitHub Pages aus einem privaten Repository setzt einen bezahlten Tarif voraus, auf dem kostenlosen Konto muss das Repository öffentlich sein. Der saubere Ausweg ist ein öffentliches Repository, in dem die Regeltexte nicht liegen (per .gitignore draußen, sie bleiben lokal). Der Code und die Design-Dokumente sind deine eigene Arbeit und unproblematisch.
+
+Vier Entscheidungen
+1 · Name und Sichtbarkeit. Vorschlag: voidfall-helper, öffentlich, Regeltexte per .gitignore ausgenommen.
+
+2 · Darf ich außerhalb von Output/ schreiben? Bisher gilt: nichts außerhalb anfassen. git init legt .git/ im Projektstamm an, dazu kämen .gitignore und README.md. Ohne dein Ja geht es nicht.
+
+3 · Struktur — hier liegt der eigentliche Unterschied.
+
+Zero-Risk: alles bleibt, wo es ist. Deine Seite hieße dann dein-name.github.io/voidfall-helper/Output/prototype-v2.html. Funktioniert, ist nur eine hässliche Adresse.
+
+Aufgeräumt (mein Vorschlag): die Datei wandert als index.html in den Stamm — dann serviert Pages sie direkt unter dein-name.github.io/voidfall-helper/, und der Doppelklick funktioniert genauso weiter.
+
+index.html          ← prototype-v2.html, umbenannt
+design-tokens.css
+docs/               ← 00-INPUT-INVENTORY, 01-DRAFT-COMPARISON, Handoffs
+archive/            ← die drei Entwürfe, unangetastet
+.gitignore          ← Regeltexte, Backup-Datei
+README.md
+4 · Die Backup-Kopie. prototype-v2.backup-preprofiles.html war die Rückfallebene, weil es kein Git gab. Ab jetzt macht Git das besser — ich würde sie rauswerfen.
+
+Was du davon hast, sofort
+Der erste Commit ist ein einziger großer Stand, eine Historie der bisherigen Entwicklung lässt sich nicht rückwirkend erzeugen. Ab da aber: jeder Umbau nachvollziehbar, nichts mehr per Hand kopieren — und genau das brauchen wir, bevor der Resolver anfängt.
+
+Sag mir Name, Sichtbarkeit und ob die aufgeräumte Struktur in Ordnung ist, dann setze ich es im Hauptchat auf.

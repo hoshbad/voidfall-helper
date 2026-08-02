@@ -1,0 +1,223 @@
+/* ============================================================================
+   Voidfall Combat Helper — Design Tokens
+   ----------------------------------------------------------------------------
+   Herkunft der Palette: Die offizielle Companion-App
+   (https://voidfallapp.mindclashgames.com/) ist eine Flutter-CanvasKit-App und
+   rendert vollstaendig in ein WebGL-Canvas — sie hat kein DOM, keine CSS-
+   Variablen und kein auslesbares Stylesheet. Die Farbwerte unten sind deshalb
+   per Pixel-Sampling aus ihren eigenen Asset-Grafiken gewonnen (Bilder im
+   Browser in ein Canvas gezeichnet, Farbhistogramm quantisiert). Es wurde
+   keine Grafik heruntergeladen oder eingebettet.
+
+   Belegte Werte (Asset -> dominante Farbe):
+     invader.png ................. #e00010  -> Invader = rot
+     defender.png ................ #30b0e0  -> Defender = cyan
+     Corvette/Sentry/Destroyer/
+     Dreadnought/Carriericon.png . #f0a000  -> Fleet Power = bernstein
+     BackgroundTechBasic.png ..... #302030  -> Panel dunkel (Basic)
+     BackgroundTechImproved.png .. #d0c0c0  -> Panel hell  (Improved)
+     voidborn_power.png .......... #f07030  -> Voidborn / Corruption = orange
+     Corruption.png .............. #f07030
+     hit_approach/hit_salvo.png .. #e00020 / #e03020 -> Damage = rot
+     absorb_approach/salvo.png ... #0050a0 + #30b0e0 -> Absorption = blau/cyan
+     initiative.png .............. #f0f0f0 -> Initiative = weiss
+     SectorDefenseicon.png ....... #a01060 -> Sector Defense = magenta
+     Starbaseicon.png ............ #302080 -> Starbase = indigo
+     Shipyardicon.png ............ #608060 -> Shipyard = oliv
+     app_background.jpg .......... #000000 / #400030 / #501040 -> Nebel-Verlauf
+     <Tech>.jpg Kartenrahmen ..... #007030 -> Technologie-Rahmen gruen
+
+   Abgeleitet, nicht belegt (in der Referenz-App sind alle Flotten bernstein):
+     die Farben pro Flottentyp (--fleet-*). Sie stammen aus der Kartenillustration
+     der jeweiligen Technologie (Sentries.jpg teal, Dreadnoughts.jpg blau,
+     Carriers.jpg koralle, Destroyers.jpg violett) und sind meine Ergaenzung,
+     damit sich die fuenf Flottenzeilen ohne Lesen unterscheiden lassen.
+
+   Typografie: Die Hausschrift von Voidfall ist eine lizenzierte Display-Schrift
+   und darf/kann nicht geladen werden (Vorgabe: keine externen Fonts). Ersatz ist
+   der System-Stack; der Sci-Fi-Charakter kommt ueber Versalien, Laufweite und
+   die Farbwelt, nicht ueber die Schrift.
+   ========================================================================== */
+
+:root {
+  /* ---- Hintergruende -------------------------------------------------- */
+  --void-0:            #05030a;   /* tiefster Grund, hinter allem            */
+  --void-1:            #0d0713;   /* App-Hintergrund                          */
+  --nebula-a:          #2a0426;   /* Nebel-Verlauf warm                       */
+  --nebula-b:          #12082a;   /* Nebel-Verlauf kalt                       */
+
+  /* ---- Flaechen ------------------------------------------------------- */
+  --surface-1:         #1b1220;   /* Karte / Sektion                          */
+  --surface-2:         #302030;   /* Panel (aus BackgroundTechBasic.png)      */
+  --surface-3:         #403040;   /* erhoehtes Panel, Chip-Grund              */
+  --surface-4:         #4e3c50;   /* Hover / gedrueckt                        */
+  --surface-sheet:     #17101c;   /* Bottom-Sheet, Keypad                     */
+  --line:              #55405a;   /* Trennlinie, Rahmen                       */
+  --line-soft:         #3a2b40;
+
+  /* ---- Text ----------------------------------------------------------- */
+  --text-1:            #f4eef6;   /* primaer                                  */
+  --text-2:            #b6a4bd;   /* sekundaer / Label                        */
+  --text-3:            #7d6b86;   /* tertiaer / deaktiviert                   */
+  --text-on-light:     #24101f;   /* Text auf Improved-Silber                 */
+
+  /* ---- Marke / Akzent ------------------------------------------------- */
+  --accent:            #f0a000;   /* Fleet Power, Primaeraktion               */
+  --accent-hi:         #ffbe33;
+  --accent-dim:        #8a5c00;
+  --accent-2:          #30b0e0;   /* sekundaerer Akzent, Cyan                 */
+
+  /* ---- Parteien ------------------------------------------------------- */
+  --invader:           #e00020;
+  --invader-hi:        #ff4055;
+  --invader-dim:       #4a0a15;
+  --invader-wash:      rgba(224, 0, 32, .12);
+
+  --defender:          #30b0e0;
+  --defender-hi:       #6fd2f5;
+  --defender-dim:      #0a3348;
+  --defender-wash:     rgba(48, 176, 224, .12);
+
+  --voidborn:          #f07030;   /* Voidborn-Flotten und Corruption          */
+  --voidborn-wash:     rgba(240, 112, 48, .14);
+  --fallen:            #a01060;   /* Fallen House                             */
+  --fallen-wash:       rgba(160, 16, 96, .14);
+
+  /* ---- Kampf-Semantik ------------------------------------------------- */
+  --damage:            #e03020;   /* Schaden allgemein                        */
+  --damage-approach:   #e00020;
+  --damage-salvo:      #ff5a3c;
+  --absorb:            #0050a0;   /* Absorption Fuellung                      */
+  --absorb-hi:         #30b0e0;   /* Absorption Kontur                        */
+  --initiative:        #f0f0f0;
+  --win:               #3fbf7f;
+  --lose:              #e0455a;
+  --tie:               #c8a23c;
+
+  /* ---- Installationen ------------------------------------------------- */
+  --sector-defense:    #d13f88;   /* aufgehellt aus #a01060 fuer Lesbarkeit   */
+  --starbase:          #7b68e8;   /* aufgehellt aus #302080                   */
+  --shipyard:          #7fa87f;   /* aus #608060                              */
+
+  /* ---- Flottentypen --------------------------------------------------- */
+  --fleet-corvette:    #f0a000;
+  --fleet-sentry:      #3fa0b4;
+  --fleet-destroyer:   #9a72e0;
+  --fleet-dreadnought: #3f86d6;
+  --fleet-carrier:     #f0705a;
+  --fleet-voidborn:    #f07030;
+
+  /* ---- Technologie-Zustaende ------------------------------------------
+     Direkt aus den beiden Karten-Hintergruenden der Referenz-App:
+     Basic = dunkles Pflaume, Improved = helles Silber.                     */
+  --tech-none-bg:      #241a2a;
+  --tech-none-line:    #45354b;
+  --tech-none-text:    #8d7c95;
+
+  --tech-basic-bg:     #302030;
+  --tech-basic-line:   #f0a000;
+  --tech-basic-text:   #ffcb5c;
+
+  --tech-improved-bg:  #d0c0c0;
+  --tech-improved-line:#ffffff;
+  --tech-improved-text:#24101f;
+
+  --tech-frame:        #007030;   /* Rahmenfarbe der Technologiekarten       */
+
+  /* ---- Navigation und Aktionen (neu in v2) ----------------------------
+     Der Next-Button traegt den Primaerakzent, weil er die einzige
+     vorwaertsgerichtete Aktion einer Maske ist. Back liegt auf dem Panel-
+     Ton, damit die beiden nebeneinander nicht konkurrieren. Reset ist die
+     einzige destruktive Aktion und deshalb als einziges Element in --lose
+     gehalten — nicht in Rot der Invader-Partei, damit Partei- und
+     Warnfarbe nicht verwechselt werden.                                    */
+  --next-bg:           #f0a000;   /* = --accent                              */
+  --next-bg-hi:        #ffbe33;
+  --next-fg:           #241000;
+  --next-line:         #8a5c00;
+
+  --back-bg:           #302030;   /* = --surface-2                           */
+  --back-fg:           #f4eef6;
+  --back-line:         #55405a;
+
+  --reset-fg:          #e0455a;   /* = --lose                                */
+  --reset-bg:          rgba(224, 69, 90, .10);
+  --reset-line:        #7a2430;
+
+  /* ---- Unentschieden-Hinweis (Maske 3, neu in v2) ---------------------
+     Eigener Satz statt nur --tie, weil der Hinweis eine Flaeche und keinen
+     Text einfaerbt: --tie auf Flaeche waere zu dunkel fuer den Text darauf.  */
+  --tie-wash:          rgba(200, 162, 60, .14);
+  --tie-line:          #c8a23c;   /* = --tie                                 */
+  --tie-text:          #f0d48a;   /* aus --tie aufgehellt, lesbar auf Wash   */
+
+  /* ---- Overlay (Reset-Rueckfrage, neu in v2) --------------------------- */
+  --scrim:             rgba(5, 3, 10, .74);   /* --void-0 mit Deckung        */
+
+  /* ---- Typografie ------------------------------------------------------ */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable",
+             "Segoe UI", system-ui, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+              "Roboto Mono", monospace;
+
+  --fs-micro:   10px;   /* Marginalie, Fussnote im Log                       */
+  --fs-label:   11px;   /* Versal-Label                                      */
+  --fs-small:   13px;
+  --fs-body:    15px;   /* Fliesstext, Standard                              */
+  --fs-lead:    17px;
+  --fs-title:   21px;   /* Maskentitel                                       */
+  --fs-display: 28px;   /* grosse Zahl im Ergebnis                           */
+  --fs-hero:    40px;   /* FP-Zahl im Eingabefeld                            */
+
+  --lh-tight: 1.15;
+  --lh-normal: 1.45;
+
+  --ls-label: .09em;    /* Laufweite fuer Versalien                          */
+  --ls-title: .04em;
+
+  --fw-regular: 400;
+  --fw-medium:  550;
+  --fw-bold:    700;
+
+  /* ---- Abstaende (4px-Raster) ----------------------------------------- */
+  --sp-0:  0px;
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* ---- Radien ---------------------------------------------------------- */
+  --r-sm:   6px;
+  --r-md:  10px;
+  --r-lg:  14px;
+  --r-xl:  20px;
+  --r-pill: 999px;
+
+  /* ---- Erhebung -------------------------------------------------------- */
+  --shadow-1: 0 1px 2px rgba(0,0,0,.5);
+  --shadow-2: 0 4px 14px rgba(0,0,0,.55);
+  --shadow-3: 0 10px 34px rgba(0,0,0,.65);
+  --glow-accent:   0 0 0 1px var(--accent),   0 0 12px rgba(240,160,0,.35);
+  --glow-invader:  0 0 0 1px var(--invader),  0 0 12px rgba(224,0,32,.35);
+  --glow-defender: 0 0 0 1px var(--defender), 0 0 12px rgba(48,176,224,.35);
+
+  /* ---- Touch / Ergonomie ----------------------------------------------- */
+  --tap-min:      44px;   /* Apple HIG Minimum                               */
+  --tap-comfort:  52px;   /* Zielgroesse fuer Kernbedienelemente             */
+  --thumb-zone:   240px;  /* unteres Bildschirmdrittel iPhone 15 Pro         */
+
+  /* ---- Bewegung -------------------------------------------------------- */
+  --dur-fast: 110ms;
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
+  --ease: cubic-bezier(.2, .7, .3, 1);
+
+  /* ---- Breakpoints (dokumentarisch; CSS braucht Literale) --------------- */
+  --bp-tablet: 720px;     /* ab hier stehen Maske 2 und 3 nebeneinander      */
+  --bp-wide:  1100px;
+}

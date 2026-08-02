@@ -1,0 +1,745 @@
+<!--
+================================================================================
+  VOIDFALL COMBAT HELPER — DRAFT 3  "SECTOR"
+================================================================================
+
+  KERNIDEE
+  Kein Formular, sondern der Kampfsektor selbst. Beide Parteien stehen sich als
+  Zonen gegenueber; die Flotten sind grosse Kacheln mit der Schiffssilhouette
+  und der Fleet Power darin. Es gibt kein Eingabefeld — man manipuliert die
+  Flotte direkt:
+
+      Tap auf die Kachel ........ +1 Fleet Power
+      Horizontal wischen ........ Wert scrubben, etwa 18 px pro Punkt
+      Langer Druck (450 ms) ..... auf 0 zuruecksetzen
+
+  Damit kostet jede Zahl entweder wenige Taps (kleine Werte) oder genau eine
+  Geste (grosse Werte) — 9 Fleet Power sind ein Wisch, kein neunfaches Tippen.
+  Die Kachel ist 100 x 96 px gross und liegt im unteren Bildschirmdrittel; man
+  muss nichts treffen, was kleiner ist als der Daumen.
+
+  Die zweite Idee betrifft die Technologien: Sie werden im Regelfall gar nicht
+  eingegeben. Das Spieler-Profil belegt sie vor, und die Zone zeigt nur eine
+  schmale Leiste der tatsaechlich aktiven Technologien. Ein Tap auf ein Badge
+  wechselt die Stufe, ein Tap auf "＋" oeffnet ein Bottom-Sheet mit der
+  vollstaendigen Liste. Im haeufigen Fall ist die Zahl der Technologie-
+  Interaktionen null.
+
+  BEWUSST GEOPFERT
+  - Entdeckbarkeit. Tap, Wisch und langer Druck auf derselben Flaeche sind
+    nicht selbsterklaerend. Der Entwurf braucht eine einmalige Erklaerzeile
+    (unter der Zone eingeblendet, solange noch nichts eingegeben wurde) und
+    verliert ohne sie sofort gegen die anderen beiden.
+  - Praezision beim Scrubben. Wer schnell wischt, landet leicht einen Punkt
+    daneben. Deshalb bleibt der Tap als exaktes +1 erhalten und der Wert wird
+    waehrend der Geste gross ueber der Kachel angezeigt.
+  - Vollstaendigkeit im Sichtfeld. Was nicht im Profil steht, ist hinter dem
+    Sheet versteckt. Wer ohne Profil arbeitet, tippt hier am meisten.
+
+  KEINE KAMPFLOGIK. Ergebnis und Kampflog sind hartcodierte Dummy-Werte aus
+  COMBAT-RULES.md Paragraph 8. Das Floating-Kurzergebnis benutzt einen
+  ausdruecklich als "dummy" gekennzeichneten Platzhalter, keinen Resolver.
+================================================================================
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Voidfall Combat Helper — Draft 3 · Sector</title>
+<style>
+/* ===== Design Tokens (identisch in allen drei Entwuerfen) ================= */
+:root{
+  --void-0:#05030a; --void-1:#0d0713; --nebula-a:#2a0426; --nebula-b:#12082a;
+  --surface-1:#1b1220; --surface-2:#302030; --surface-3:#403040; --surface-4:#4e3c50;
+  --surface-sheet:#17101c; --line:#55405a; --line-soft:#3a2b40;
+  --text-1:#f4eef6; --text-2:#b6a4bd; --text-3:#7d6b86; --text-on-light:#24101f;
+  --accent:#f0a000; --accent-hi:#ffbe33; --accent-dim:#8a5c00; --accent-2:#30b0e0;
+  --invader:#e00020; --invader-hi:#ff4055; --invader-dim:#4a0a15; --invader-wash:rgba(224,0,32,.12);
+  --defender:#30b0e0; --defender-hi:#6fd2f5; --defender-dim:#0a3348; --defender-wash:rgba(48,176,224,.12);
+  --voidborn:#f07030; --voidborn-wash:rgba(240,112,48,.14); --fallen:#a01060; --fallen-wash:rgba(160,16,96,.14);
+  --damage:#e03020; --damage-approach:#e00020; --damage-salvo:#ff5a3c;
+  --absorb:#0050a0; --absorb-hi:#30b0e0; --initiative:#f0f0f0;
+  --win:#3fbf7f; --lose:#e0455a; --tie:#c8a23c;
+  --sector-defense:#d13f88; --starbase:#7b68e8; --shipyard:#7fa87f;
+  --fleet-corvette:#f0a000; --fleet-sentry:#3fa0b4; --fleet-destroyer:#9a72e0;
+  --fleet-dreadnought:#3f86d6; --fleet-carrier:#f0705a; --fleet-voidborn:#f07030;
+  --tech-none-bg:#241a2a; --tech-none-line:#45354b; --tech-none-text:#8d7c95;
+  --tech-basic-bg:#302030; --tech-basic-line:#f0a000; --tech-basic-text:#ffcb5c;
+  --tech-improved-bg:#d0c0c0; --tech-improved-line:#ffffff; --tech-improved-text:#24101f;
+  --tech-frame:#007030;
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable","Segoe UI",system-ui,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-num:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,"Roboto Mono",monospace;
+  --fs-micro:10px; --fs-label:11px; --fs-small:13px; --fs-body:15px; --fs-lead:17px;
+  --fs-title:21px; --fs-display:28px; --fs-hero:40px;
+  --lh-tight:1.15; --lh-normal:1.45; --ls-label:.09em; --ls-title:.04em;
+  --fw-regular:400; --fw-medium:550; --fw-bold:700;
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px;
+  --sp-8:32px; --sp-10:40px; --sp-12:48px;
+  --r-sm:6px; --r-md:10px; --r-lg:14px; --r-xl:20px; --r-pill:999px;
+  --shadow-1:0 1px 2px rgba(0,0,0,.5); --shadow-2:0 4px 14px rgba(0,0,0,.55); --shadow-3:0 10px 34px rgba(0,0,0,.65);
+  --glow-accent:0 0 0 1px var(--accent),0 0 12px rgba(240,160,0,.35);
+  --glow-invader:0 0 0 1px var(--invader),0 0 12px rgba(224,0,32,.35);
+  --glow-defender:0 0 0 1px var(--defender),0 0 12px rgba(48,176,224,.35);
+  --tap-min:44px; --tap-comfort:52px;
+  --dur-fast:110ms; --dur-base:180ms; --dur-slow:280ms; --ease:cubic-bezier(.2,.7,.3,1);
+}
+
+/* ===== Grundgeruest ====================================================== */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow-x:hidden}
+body{font-family:var(--font-ui);font-size:var(--fs-body);color:var(--text-1);background:var(--void-1);
+  background-image:radial-gradient(120% 60% at 12% -10%,var(--nebula-a) 0%,transparent 60%),
+                   radial-gradient(100% 55% at 95% 8%,var(--nebula-b) 0%,transparent 62%);
+  background-attachment:fixed;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;margin:0}
+.lbl{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--text-3);font-weight:var(--fw-medium)}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.app{display:flex;flex-direction:column;min-height:100%;max-width:1180px;margin:0 auto}
+
+/* ===== Kopfzeile ========================================================= */
+.topbar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:var(--sp-2);
+  padding:var(--sp-2) var(--sp-3);padding-top:max(var(--sp-2),env(safe-area-inset-top));
+  background:linear-gradient(180deg,rgba(13,7,19,.97) 60%,rgba(13,7,19,.82));
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line-soft)}
+.crumbs{display:flex;align-items:center;gap:2px;flex:1;min-width:0}
+.crumb{display:flex;align-items:center;justify-content:center;gap:6px;min-height:var(--tap-min);
+  min-width:var(--tap-min);padding:0 9px;border-radius:var(--r-pill);font-size:var(--fs-small);
+  color:var(--text-3);white-space:nowrap}
+.crumb .dot{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);
+  color:var(--text-2);font-size:var(--fs-micro);font-weight:var(--fw-bold);flex:none}
+.crumb.done{color:var(--text-2)} .crumb.done .dot{background:var(--accent-dim);color:var(--accent-hi)}
+.crumb[aria-current="step"]{background:var(--surface-2);color:var(--text-1)}
+.crumb[aria-current="step"] .dot{background:var(--accent);color:#241000}
+.crumb:disabled{opacity:.42}
+.crumb .cname{display:none}
+@media(min-width:520px){.crumb .cname{display:inline}}
+.mini{flex:none;display:flex;align-items:center;gap:var(--sp-2);min-height:var(--tap-min);padding:0 var(--sp-3);
+  border-radius:var(--r-pill);background:var(--surface-2);border:1px solid var(--line);box-shadow:var(--shadow-2)}
+.mini.pulse{animation:miniPulse 480ms var(--ease)}
+@keyframes miniPulse{0%{transform:scale(1)}35%{transform:scale(1.075);box-shadow:var(--glow-accent)}100%{transform:scale(1)}}
+.mini .who{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;font-weight:var(--fw-bold);line-height:1}
+.mini .who.inv{color:var(--invader-hi)} .mini .who.def{color:var(--defender-hi)}
+.mini .who.tie{color:var(--tie)} .mini .who.na{color:var(--text-3)}
+.mini .fp{display:flex;align-items:baseline;gap:3px}
+.mini .fp b{font-family:var(--font-num);font-size:var(--fs-lead);color:var(--accent);line-height:1}
+.mini .fp span{font-size:var(--fs-micro);color:var(--text-3)}
+.mini .tag{font-size:8px;letter-spacing:.14em;color:var(--text-3);border:1px solid var(--line);
+  border-radius:3px;padding:1px 3px;text-transform:uppercase}
+
+/* ===== Masken ============================================================ */
+.screens{flex:1;display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column}
+.screen.on{display:flex}
+.pad{padding:var(--sp-4) var(--sp-3) var(--sp-8)}
+h1.title{font-size:var(--fs-title);letter-spacing:var(--ls-title);margin:0 0 var(--sp-1);font-weight:var(--fw-bold)}
+p.sub{margin:0 0 var(--sp-5);color:var(--text-2);font-size:var(--fs-small);line-height:var(--lh-normal)}
+
+/* ===== Maske 1 =========================================================== */
+.profiles{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);margin-bottom:var(--sp-5)}
+.prof{display:flex;flex-direction:column;padding:var(--sp-1) var(--sp-3) 0;background:var(--surface-1);
+  border:1px solid var(--line-soft);border-radius:var(--r-md)}
+.prof label{font-size:var(--fs-micro);letter-spacing:var(--ls-label);text-transform:uppercase}
+.prof.inv label{color:var(--invader-hi)} .prof.def label{color:var(--defender-hi)}
+.prof select{appearance:none;width:100%;background:transparent;border:0;color:var(--text-1);
+  font-size:var(--fs-small);font-weight:var(--fw-medium);min-height:var(--tap-min)}
+.prof select option{background:var(--surface-2);color:var(--text-1)}
+.types{display:flex;flex-direction:column;gap:var(--sp-2)}
+.type{display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;min-height:76px;
+  padding:var(--sp-3) var(--sp-4);background:var(--surface-1);border:1px solid var(--line-soft);border-radius:var(--r-lg)}
+.type:active{transform:scale(.985);background:var(--surface-2)}
+.type .sig{width:44px;height:44px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;
+  background:var(--surface-2);border:1px solid var(--line)}
+.type .sig svg{width:26px;height:26px}
+.type .txt{flex:1;min-width:0}
+.type .txt b{display:block;font-size:var(--fs-body);font-weight:var(--fw-medium)}
+.type .txt small{display:block;color:var(--text-3);font-size:var(--fs-micro);margin-top:2px}
+.type .go{color:var(--text-3);font-size:var(--fs-lead)}
+.type[data-t="pvp"]{border-left:3px solid var(--invader)}
+.type[data-t="pvv"]{border-left:3px solid var(--voidborn)}
+.type[data-t="skirmish"]{border-left:3px solid var(--defender)}
+.type[data-t="fallen"]{border-left:3px solid var(--fallen)}
+.type.sel{border-color:var(--accent);box-shadow:var(--glow-accent)}
+
+/* ===== Der Sektor ======================================================== */
+.duo{display:flex;flex-direction:column;flex:1}
+.zone{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;
+  border-radius:var(--r-xl);margin:var(--sp-3);padding:var(--sp-3);overflow:hidden}
+.zone.inv{background:
+    radial-gradient(120% 90% at 50% 0%,var(--invader-wash),transparent 70%),var(--surface-1);
+  border:1px solid var(--invader-dim)}
+.zone.def{background:
+    radial-gradient(120% 90% at 50% 100%,var(--defender-wash),transparent 70%),var(--surface-1);
+  border:1px solid var(--defender-dim)}
+.zone.vb{background:radial-gradient(120% 90% at 50% 0%,var(--voidborn-wash),transparent 70%),var(--surface-1);
+  border:1px solid rgba(240,112,48,.35)}
+.zone.fh{background:radial-gradient(120% 90% at 50% 100%,var(--fallen-wash),transparent 70%),var(--surface-1);
+  border:1px solid rgba(160,16,96,.4)}
+
+.zhead{display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-3)}
+.zhead .badge{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;
+  font-weight:var(--fw-bold);padding:5px 10px;border-radius:var(--r-sm)}
+.zone.inv .zhead .badge{background:var(--invader-wash);color:var(--invader-hi);border:1px solid var(--invader)}
+.zone.def .zhead .badge{background:var(--defender-wash);color:var(--defender-hi);border:1px solid var(--defender)}
+.zhead .ctx{flex:1;font-size:var(--fs-small);color:var(--text-2);min-width:0;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.zhead .tot{font-family:var(--font-num);font-size:var(--fs-display);color:var(--accent);line-height:1}
+.zhead .tot small{font-size:var(--fs-micro);color:var(--text-3);margin-left:3px}
+
+/* --- Flotten-Kacheln --- */
+.pods{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:var(--sp-2)}
+.pod{
+  position:relative;min-height:96px;border-radius:var(--r-lg);
+  background:var(--surface-2);border:1px solid var(--line-soft);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  touch-action:pan-y;user-select:none;-webkit-user-select:none;
+  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease);
+}
+.pod .ship{width:38px;height:38px;opacity:.5;transition:opacity var(--dur-fast) var(--ease)}
+.pod .pv{font-family:var(--font-num);font-size:30px;font-weight:var(--fw-bold);line-height:1;color:var(--text-3)}
+.pod .pn{font-size:var(--fs-micro);letter-spacing:.05em;color:var(--text-3);text-align:center;
+  padding:0 4px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pod.has{background:var(--surface-3)}
+.pod.has .ship{opacity:1}
+.pod.has .pv{color:var(--accent)}
+.pod.has .pn{color:var(--text-2)}
+.pod.scrub{border-color:var(--accent);box-shadow:var(--glow-accent);background:var(--surface-4)}
+.pod:active{transform:scale(.975)}
+.pod .track{position:absolute;left:8px;right:8px;bottom:7px;height:3px;border-radius:2px;background:var(--line-soft);overflow:hidden}
+.pod .track i{display:block;height:100%;background:var(--accent);border-radius:2px;transition:width var(--dur-fast) var(--ease)}
+.pod.inst .pv{color:var(--text-3)}
+.pod.inst.has .pv{color:var(--sector-defense)}
+.pod.inst.has .track i{background:var(--sector-defense)}
+.pod.sb.has .pv{color:var(--starbase)} .pod.sb.has .track i{background:var(--starbase)}
+
+.hintline{display:flex;align-items:center;gap:6px;margin-top:var(--sp-2);font-size:var(--fs-micro);
+  color:var(--text-3);line-height:var(--lh-normal)}
+.hintline b{color:var(--text-2);font-weight:var(--fw-medium)}
+
+/* --- Loadout-Leiste --- */
+.loadout{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--sp-3);padding-top:var(--sp-3);
+  border-top:1px solid var(--line-soft)}
+.badge2{
+  display:flex;align-items:center;gap:6px;min-height:var(--tap-min);padding:0 12px;border-radius:var(--r-pill);
+  font-size:var(--fs-small);border:1px solid var(--tech-none-line);background:var(--tech-none-bg);color:var(--tech-none-text);
+}
+.badge2[data-s="1"]{background:var(--tech-basic-bg);border-color:var(--tech-basic-line);color:var(--tech-basic-text)}
+.badge2[data-s="2"]{background:var(--tech-improved-bg);border-color:var(--tech-improved-line);color:var(--tech-improved-text);font-weight:var(--fw-medium)}
+.badge2 .st{font-size:9px;letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+.badge2.dead{opacity:.4}
+.badge2.more{border-style:dashed;color:var(--text-2)}
+
+/* --- Bottom-Sheet --- */
+.scrim{position:fixed;inset:0;background:rgba(3,1,6,.66);z-index:50;opacity:0;pointer-events:none;
+  transition:opacity var(--dur-base) var(--ease)}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:51;max-height:82vh;overflow-y:auto;
+  background:var(--surface-sheet);border-top:1px solid var(--line);border-radius:var(--r-xl) var(--r-xl) 0 0;
+  padding:var(--sp-3) var(--sp-3) max(var(--sp-6),env(safe-area-inset-bottom));
+  transform:translateY(102%);transition:transform var(--dur-slow) var(--ease);box-shadow:0 -12px 40px rgba(0,0,0,.6)}
+.sheet.on{transform:translateY(0)}
+.sheet .grab{width:38px;height:4px;border-radius:2px;background:var(--line);margin:0 auto var(--sp-3)}
+.sheet h4{margin:0 0 var(--sp-3);font-size:var(--fs-lead);letter-spacing:var(--ls-title)}
+.sheet .close{position:absolute;top:var(--sp-3);right:var(--sp-3);min-width:var(--tap-min);
+  min-height:var(--tap-min);border-radius:var(--r-pill);color:var(--text-2);font-size:var(--fs-lead)}
+.trow{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) 0}
+.trow .tn{flex:1;min-width:0;font-size:var(--fs-small)}
+.trow .tn small{display:block;color:var(--text-3);font-size:var(--fs-micro);margin-top:1px}
+.tri{display:flex;gap:3px;flex:none;background:var(--surface-1);padding:3px;border-radius:var(--r-md);border:1px solid var(--line-soft)}
+.tri button{min-height:var(--tap-min);min-width:48px;padding:0 8px;border-radius:7px;font-size:var(--fs-micro);
+  letter-spacing:.07em;text-transform:uppercase;color:var(--tech-none-text)}
+.tri button[aria-pressed="true"][data-v="0"]{background:var(--tech-none-bg);color:var(--text-2);box-shadow:inset 0 0 0 1px var(--tech-none-line)}
+.tri button[aria-pressed="true"][data-v="1"]{background:var(--tech-basic-bg);color:var(--tech-basic-text);box-shadow:inset 0 0 0 1px var(--tech-basic-line)}
+.tri button[aria-pressed="true"][data-v="2"]{background:var(--tech-improved-bg);color:var(--tech-improved-text);box-shadow:inset 0 0 0 1px var(--tech-improved-line)}
+.sheet .seg{display:flex;gap:4px;background:var(--surface-1);padding:3px;border-radius:var(--r-md);
+  border:1px solid var(--line-soft);margin-top:6px}
+.sheet .seg button{flex:1;min-height:var(--tap-min);border-radius:7px;font-size:var(--fs-small);color:var(--text-3)}
+.sheet .seg button[aria-pressed="true"]{background:var(--surface-3);color:var(--text-1)}
+.sheet .field{margin:var(--sp-4) 0 0;padding-top:var(--sp-3);border-top:1px solid var(--line-soft)}
+.sheet .expl{font-size:var(--fs-micro);color:var(--text-3);margin-top:5px;line-height:var(--lh-normal)}
+.switch{display:flex;align-items:center;gap:var(--sp-3);min-height:var(--tap-min);width:100%;text-align:left}
+.switch .tr{width:46px;height:28px;border-radius:var(--r-pill);background:var(--surface-3);flex:none;position:relative;border:1px solid var(--line)}
+.switch .tr::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;
+  background:var(--text-2);transition:transform var(--dur-fast) var(--ease)}
+.switch[aria-pressed="true"] .tr{background:var(--accent-dim);border-color:var(--accent)}
+.switch[aria-pressed="true"] .tr::after{transform:translateX(18px);background:var(--accent-hi)}
+.switch .sl{font-size:var(--fs-small);flex:1}
+
+/* --- Scrub-Anzeige --- */
+.scrubhud{position:fixed;left:50%;top:34%;transform:translate(-50%,-50%) scale(.9);z-index:60;
+  font-family:var(--font-num);font-size:76px;font-weight:var(--fw-bold);color:var(--accent);
+  text-shadow:0 6px 40px rgba(0,0,0,.85);opacity:0;pointer-events:none;
+  transition:opacity var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
+.scrubhud.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+
+.fixedzone{text-align:center;padding:var(--sp-6) var(--sp-3)}
+.fixedzone .big{font-family:var(--font-num);font-size:var(--fs-hero);color:var(--sector-defense);line-height:1}
+.fixedzone p{color:var(--text-2);font-size:var(--fs-small);line-height:var(--lh-normal);max-width:34ch;margin:var(--sp-3) auto 0}
+.notice{font-size:var(--fs-micro);color:var(--text-3);line-height:var(--lh-normal)}
+
+/* ===== Maske 4 =========================================================== */
+.result{padding:var(--sp-4) var(--sp-3) var(--sp-8)}
+.verdict{border-radius:var(--r-lg);padding:var(--sp-5) var(--sp-4);text-align:center;border:1px solid var(--win);
+  background:linear-gradient(180deg,rgba(63,191,127,.16),rgba(63,191,127,.04));margin-bottom:var(--sp-4)}
+.verdict .who{font-size:var(--fs-label);letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--win);font-weight:var(--fw-bold)}
+.verdict h2{margin:var(--sp-2) 0 var(--sp-1);font-size:var(--fs-display);letter-spacing:var(--ls-title)}
+.verdict .rem{color:var(--text-2);font-size:var(--fs-small)}
+.verdict .rem b{font-family:var(--font-num);color:var(--accent);font-size:var(--fs-lead)}
+.fpbars{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2);margin-bottom:var(--sp-5)}
+.fpbar{background:var(--surface-1);border:1px solid var(--line-soft);border-radius:var(--r-md);padding:var(--sp-3)}
+.fpbar .lbl{display:block;margin-bottom:6px}
+.fpbar.inv{border-left:3px solid var(--invader)} .fpbar.def{border-left:3px solid var(--defender)}
+.fpbar .v{font-family:var(--font-num);font-size:var(--fs-display);line-height:1}
+.fpbar.inv .v{color:var(--invader-hi)} .fpbar.def .v{color:var(--defender-hi)}
+.fpbar .d{font-size:var(--fs-micro);color:var(--text-3);margin-top:4px}
+.log{border-top:1px solid var(--line-soft);padding-top:var(--sp-4)}
+.log h3{font-size:var(--fs-lead);margin:0 0 var(--sp-3);letter-spacing:var(--ls-title)}
+.step{background:var(--surface-1);border:1px solid var(--line-soft);border-radius:var(--r-md);margin-bottom:var(--sp-2);overflow:hidden}
+.step > summary{list-style:none;display:flex;align-items:center;gap:var(--sp-3);min-height:var(--tap-comfort);
+  padding:var(--sp-2) var(--sp-3);cursor:pointer}
+.step > summary::-webkit-details-marker{display:none}
+.step .sname{flex:1;font-size:var(--fs-small);font-weight:var(--fw-medium)}
+.step .sfp{display:flex;align-items:center;gap:6px;font-family:var(--font-num);font-size:var(--fs-small)}
+.step .sfp .i{color:var(--invader-hi)} .step .sfp .d{color:var(--defender-hi)} .step .sfp .sep{color:var(--text-3)}
+.step .chev{color:var(--text-3);transition:transform var(--dur-fast)}
+.step[open] .chev{transform:rotate(90deg)}
+.step .body{padding:var(--sp-3);border-top:1px solid var(--line-soft)}
+.calc{display:flex;flex-direction:column;gap:var(--sp-2)}
+.line{display:flex;align-items:flex-start;gap:var(--sp-2);font-size:var(--fs-small);line-height:var(--lh-normal)}
+.line .pip{width:8px;height:8px;border-radius:2px;flex:none;margin-top:6px}
+.line .pip.dmg{background:var(--damage)} .line .pip.abs{background:var(--absorb-hi)}
+.line .pip.ini{background:var(--initiative)} .line .pip.res{background:var(--accent)}
+.line span{flex:1;color:var(--text-2)} .line b{color:var(--text-1);font-family:var(--font-num)}
+
+/* ===== Tablet-Breakpoint: der Sektor wird eine Flaeche ==================== */
+@media(min-width:720px){
+  .duo.pair{flex-direction:row;align-items:stretch}
+  .duo.pair > .zone{flex:1 1 50%}
+  .duo.pair > .zone.inv{margin-right:var(--sp-1)}
+  .duo.pair > .zone.def{margin-left:var(--sp-1)}
+  .crumb .cname{display:inline}
+  .types{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+  .pad{padding:var(--sp-6) var(--sp-5) var(--sp-8)}
+  .result{padding:var(--sp-5)}
+  .pods{grid-template-columns:repeat(auto-fill,minmax(112px,1fr))}
+  .sheet{left:50%;right:auto;transform:translate(-50%,102%);width:min(560px,94vw);
+    border-radius:var(--r-xl) var(--r-xl) 0 0}
+  .sheet.on{transform:translate(-50%,0)}
+}
+</style>
+
+<body>
+<svg class="sr" aria-hidden="true"><defs>
+  <symbol id="i-corvette" viewBox="0 0 24 24"><path d="M12 2 15 9l6 3-6 1.6L12 22l-3-8.4L3 12l6-3z" fill="currentColor"/></symbol>
+  <symbol id="i-sentry" viewBox="0 0 24 24"><path d="M12 2.6 20 7v10l-8 4.4L4 17V7z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></symbol>
+  <symbol id="i-destroyer" viewBox="0 0 24 24"><path d="M12 2 14.6 10H21l-4.4 3.2L18 21l-6-3.6L6 21l1.4-7.8L3 10h6.4z" fill="currentColor"/></symbol>
+  <symbol id="i-dreadnought" viewBox="0 0 24 24"><path d="M12 2 21 8v6l-9 8-9-8V8z" fill="currentColor" opacity=".9"/><path d="M12 6.5 17 9.6v3.2l-5 4.4-5-4.4V9.6z" fill="var(--surface-3)"/></symbol>
+  <symbol id="i-carrier" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 10h5v4H7z" fill="currentColor"/><path d="M15 9.2 19.4 12 15 14.8z" fill="currentColor"/></symbol>
+  <symbol id="i-voidborn" viewBox="0 0 24 24"><path d="M12 1.6 14 8l6.4-1.4L16 11.4l4.4 4.8L14 15l-2 7.4L10 15l-6.4 1.2L8 11.4 3.6 6.6 10 8z" fill="currentColor"/></symbol>
+  <symbol id="i-sd" viewBox="0 0 24 24"><path d="M12 2.4 20.4 6v6.4c0 4.6-3.4 8-8.4 9.2-5-1.2-8.4-4.6-8.4-9.2V6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.6 12.2 11 14.6l4.6-4.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="i-starbase" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><ellipse cx="12" cy="12" rx="10" ry="4" fill="none" stroke="currentColor" stroke-width="1.6" transform="rotate(-24 12 12)"/></symbol>
+  <symbol id="i-pvp" viewBox="0 0 24 24"><path d="M4 12h6M14 12h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="12" r="2.6" fill="var(--invader)"/><circle cx="20" cy="12" r="2.6" fill="var(--defender)"/><path d="M12 6v12" stroke="var(--text-3)" stroke-width="1.4" stroke-dasharray="2 3"/></symbol>
+  <symbol id="i-fallen" viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 21v-6h6v6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3 4l18 17" stroke="currentColor" stroke-width="1.5" opacity=".55"/></symbol>
+</defs></svg>
+
+<div class="app">
+  <header class="topbar">
+    <nav class="crumbs" aria-label="Steps">
+      <button class="crumb" data-go="1"><span class="dot">1</span><span class="cname">Combat</span></button>
+      <button class="crumb" data-go="2"><span class="dot">2</span><span class="cname">Invader</span></button>
+      <button class="crumb" data-go="3"><span class="dot">3</span><span class="cname">Defender</span></button>
+      <button class="crumb" data-go="4"><span class="dot">4</span><span class="cname">Result</span></button>
+    </nav>
+    <button class="mini" id="mini" aria-label="Quick result, go to result screen">
+      <span class="who na" id="miniWho">—</span>
+      <span class="fp"><b id="miniFp">–</b><span>FP</span></span>
+      <span class="tag">dummy</span>
+    </button>
+  </header>
+
+  <div class="screens">
+    <section class="screen on" data-screen="1">
+      <div class="pad">
+        <h1 class="title">New combat</h1>
+        <p class="sub">Pick a combat type — one tap takes you straight to the Invader zone.</p>
+        <div class="profiles">
+          <div class="prof inv"><label for="pInv">Invader profile</label><select id="pInv"></select></div>
+          <div class="prof def"><label for="pDef">Defender profile</label><select id="pDef"></select></div>
+        </div>
+        <div class="types">
+          <button class="type" data-t="pvp"><span class="sig" style="color:var(--invader-hi)"><svg><use href="#i-pvp"/></svg></span>
+            <span class="txt"><b>Player vs Player</b><small>Both sides fully configurable</small></span><span class="go">›</span></button>
+          <button class="type" data-t="pvv"><span class="sig" style="color:var(--voidborn)"><svg><use href="#i-voidborn"/></svg></span>
+            <span class="txt"><b>Player vs Voidborn</b><small>Defender: Fleet Power + Sector Defenses only</small></span><span class="go">›</span></button>
+          <button class="type" data-t="skirmish"><span class="sig" style="color:var(--defender-hi)"><svg><use href="#i-voidborn"/></svg></span>
+            <span class="txt"><b>Voidborn vs Player</b><small>Skirmish — you are the Defender</small></span><span class="go">›</span></button>
+          <button class="type" data-t="fallen"><span class="sig" style="color:var(--fallen)"><svg><use href="#i-fallen"/></svg></span>
+            <span class="txt"><b>Player vs Fallen House</b><small>Defender fixed: 2 Sector Defenses</small></span><span class="go">›</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen" data-screen="2"><div class="duo" id="duo2"></div></section>
+    <section class="screen" data-screen="3"><div class="duo" id="duo3"></div></section>
+
+    <section class="screen" data-screen="4">
+      <div class="result">
+        <div class="verdict">
+          <div class="who">Invader victory</div><h2>Sector taken</h2>
+          <div class="rem">Remaining Fleet Power <b>2</b> Corvette FP</div>
+        </div>
+        <div class="fpbars">
+          <div class="fpbar inv"><span class="lbl">Invader</span><div class="v">2</div><div class="d">4 → 2 · lost 2 FP</div></div>
+          <div class="fpbar def"><span class="lbl">Defender</span><div class="v">0</div><div class="d">3 → 0 · wiped out</div></div>
+        </div>
+        <div class="log">
+          <h3>Combat log</h3>
+          <details class="step" open><summary><span class="chev">›</span><span class="sname">Approach step</span>
+            <span class="sfp"><span class="i">4→3</span><span class="sep">·</span><span class="d">3→3</span></span></summary>
+            <div class="body"><div class="calc">
+              <div class="line"><i class="pip dmg"></i><span>Defender: 1 Sector Defense deals <b>1</b> Approach Damage.</span></div>
+              <div class="line"><i class="pip abs"></i><span>Invader Approach Absorption: <b>0</b> — Basic Shields grants Salvo Absorption only.</span></div>
+              <div class="line"><i class="pip res"></i><span>Invader recalls <b>1</b> Corvette FP. Invader <b>4 → 3</b>, Defender <b>3</b>.</span></div>
+            </div></div></details>
+          <details class="step"><summary><span class="chev">›</span><span class="sname">Salvo step 1</span>
+            <span class="sfp"><span class="i">3→3</span><span class="sep">·</span><span class="d">3→2</span></span></summary>
+            <div class="body"><div class="calc">
+              <div class="line"><i class="pip ini"></i><span>Initiative <b>3</b> vs <b>3</b> — equal, so both sides fire simultaneously.</span></div>
+              <div class="line"><i class="pip dmg"></i><span>Each side deals <b>1</b> Salvo Damage.</span></div>
+              <div class="line"><i class="pip abs"></i><span>Invader absorbs with Basic Shields (<b>1</b> Salvo Absorption, now used up).</span></div>
+              <div class="line"><i class="pip res"></i><span>Invader <b>3</b>, Defender <b>3 → 2</b>.</span></div>
+            </div></div></details>
+          <details class="step"><summary><span class="chev">›</span><span class="sname">Salvo step 2</span>
+            <span class="sfp"><span class="i">3→2</span><span class="sep">·</span><span class="d">2→1</span></span></summary>
+            <div class="body"><div class="calc">
+              <div class="line"><i class="pip ini"></i><span>Initiative <b>3</b> vs <b>2</b> — Invader is higher and fires first.</span></div>
+              <div class="line"><i class="pip dmg"></i><span>Defender recalls <b>1</b> FP: <b>2 → 1</b>.</span></div>
+              <div class="line"><i class="pip ini"></i><span>Defender recalculates Initiative: <b>1</b> — still ≥ 1, so it fires back.</span></div>
+              <div class="line"><i class="pip res"></i><span>Invader <b>3 → 2</b>, Defender <b>1</b>.</span></div>
+            </div></div></details>
+          <details class="step"><summary><span class="chev">›</span><span class="sname">Salvo step 3</span>
+            <span class="sfp"><span class="i">2→2</span><span class="sep">·</span><span class="d">1→0</span></span></summary>
+            <div class="body"><div class="calc">
+              <div class="line"><i class="pip ini"></i><span>Initiative <b>2</b> vs <b>1</b> — Invader fires first.</span></div>
+              <div class="line"><i class="pip dmg"></i><span>Defender recalls its last FP: <b>1 → 0</b>.</span></div>
+              <div class="line"><i class="pip ini"></i><span>Defender Initiative is now <b>0</b> — no Damage back.</span></div>
+              <div class="line"><i class="pip res"></i><span>Invader <b>2</b>, Defender <b>0</b> — combat ends.</span></div>
+            </div></div></details>
+          <p class="notice" style="text-align:center;padding:var(--sp-4) 0">Prototype — result and log are hard-coded
+            from the worked example in COMBAT-RULES.md §8. No combat is calculated in this draft.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="scrubhud" id="hud">0</div>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Technologies">
+  <div class="grab"></div>
+  <button class="close" id="sheetClose" aria-label="Close">×</button>
+  <h4 id="sheetTitle">Technologies</h4>
+  <div id="sheetBody"></div>
+</div>
+
+<script>
+"use strict";
+const PROFILES = {
+  none:      {name:"No profile", fleets:["corvette","sentry","destroyer","dreadnought","carrier"], tech:{}},
+  valnis:    {name:"Valnis · Shields",      fleets:["corvette"],               tech:{shields:2}},
+  belitan:   {name:"Belitan · Targeting",   fleets:["corvette","sentry"],      tech:{targeting:1}},
+  zenor:     {name:"Zenor · Destroyers",    fleets:["corvette","destroyer"],   tech:{destroyers:2, shields:1}},
+  shiveus:   {name:"Shiveus · Dreadnoughts",fleets:["corvette","dreadnought"], tech:{shields:1}},
+  cortozaar: {name:"Cortozaar · Torpedoes", fleets:["corvette","sentry"],      tech:{torpedoes:2}},
+  fenrax:    {name:"Fenrax · Carriers",     fleets:["corvette","carrier"],     tech:{targeting:1}},
+  marqualos: {name:"Marqualos · Drones",    fleets:["corvette","destroyer"],   tech:{drones:2}}
+};
+const FLEETS = {
+  corvette:   {label:"Corvette",    icon:"i-corvette",    color:"--fleet-corvette"},
+  sentry:     {label:"Sentry",      icon:"i-sentry",      color:"--fleet-sentry"},
+  destroyer:  {label:"Destroyer",   icon:"i-destroyer",   color:"--fleet-destroyer"},
+  dreadnought:{label:"Dreadnought", icon:"i-dreadnought", color:"--fleet-dreadnought"},
+  carrier:    {label:"Carrier",     icon:"i-carrier",     color:"--fleet-carrier"}
+};
+const TECH = {
+  targeting:  {label:"Targeting",  note:"Basic +5 Initiative · Improved first strike", states:["None","Basic","Improved"], corvette:true},
+  shields:    {label:"Shields",    note:"Salvo Absorption · Improved adds Approach",   states:["None","Basic","Improved"], corvette:true},
+  torpedoes:  {label:"Torpedoes",  note:"+1 Salvo Damage · Improved every step",       states:["None","Basic","Improved"], corvette:true},
+  destroyers: {label:"Destroyer tile", note:"Improved adds 1 flat Approach Damage",    states:[null,"Basic","Improved"], side:"inv", needs:"destroyer"},
+  dsm:        {label:"Deep Space Missiles", note:"Approach Damage from adjacent Shipyards", states:["None","Basic","Improved"]},
+  drones:     {label:"Autonomous Drones",   note:"Absorption for a Trade token",       states:["None","Basic","Improved"], side:"inv"},
+  replicators:{label:"Combat Replicators",  note:"Improved turns a tie into a win",    states:["None",null,"Improved"], side:"inv"},
+  energy:     {label:"Energy Cells",        note:"+1 Approach Damage if you dealt any",states:["None",null,"Owned"], side:"def"}
+};
+
+const S={screen:1, combatType:null, profile:{inv:"none",def:"none"}, inv:blank(), def:blank()};
+function blank(){return {corvette:0,sentry:0,destroyer:0,dreadnought:0,carrier:0,voidborn:0,
+  sectorDefenses:0,starbases:0,adjacent:0,
+  tech:{targeting:0,shields:0,torpedoes:0,destroyers:1,dsm:0,drones:0,replicators:0,energy:0},
+  spendEnergy:false,returnTrade:false,bombard:0, touched:false};}
+const isVoidborn=s=>(S.combatType==="pvv"&&s==="def")||(S.combatType==="skirmish"&&s==="inv");
+const isFallen  =s=>S.combatType==="fallen"&&s==="def";
+const isPlayer  =s=>!isVoidborn(s)&&!isFallen(s);
+const MAXFP=14;
+
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const el=(t,c,h)=>{const n=document.createElement(t); if(c)n.className=c; if(h!=null)n.innerHTML=h; return n;};
+
+/* ===== Navigation ======================================================== */
+function go(n){
+  if(n>1&&!S.combatType) n=1;
+  S.screen=n;
+  $$(".screen").forEach(s=>s.classList.toggle("on",+s.dataset.screen===n));
+  $$(".crumb").forEach(c=>{const i=+c.dataset.go;
+    c.toggleAttribute("disabled",i>1&&!S.combatType);
+    c.classList.toggle("done",i<n);
+    if(i===n) c.setAttribute("aria-current","step"); else c.removeAttribute("aria-current");});
+  if(n===2||n===3) render();
+  window.scrollTo(0,0);
+}
+$$(".crumb").forEach(c=>c.addEventListener("click",()=>go(+c.dataset.go)));
+$("#mini").addEventListener("click",()=>go(4));
+
+/* ===== Maske 1 =========================================================== */
+(function(){
+  for(const sel of ["#pInv","#pDef"]){
+    const node=$(sel);
+    Object.entries(PROFILES).forEach(([k,p])=>node.append(new Option(p.name,k)));
+    node.addEventListener("change",()=>{
+      const side=sel==="#pInv"?"inv":"def";
+      S.profile[side]=node.value; applyProfile(side);
+      if(S.screen===2||S.screen===3) render();
+      bump();
+    });
+  }
+})();
+function applyProfile(side){
+  const p=PROFILES[S.profile[side]], t=S[side].tech;
+  Object.keys(t).forEach(k=>{ if(k!=="destroyers") t[k]=0; });
+  Object.assign(t,p.tech);
+  if(S.profile[side]!=="none") Object.keys(FLEETS).forEach(f=>{ if(!p.fleets.includes(f)) S[side][f]=0; });
+}
+$$(".type").forEach(b=>b.addEventListener("click",()=>{
+  S.combatType=b.dataset.t;
+  $$(".type").forEach(x=>x.classList.toggle("sel",x===b));
+  applyProfile("inv"); applyProfile("def");
+  go(2); bump();
+}));
+
+/* ===== Sektor rendern ==================================================== */
+function render(){
+  const wide=window.innerWidth>=720;
+  const d2=$("#duo2"), d3=$("#duo3");
+  d2.innerHTML=""; d3.innerHTML="";
+  d2.classList.toggle("pair",wide); d3.classList.toggle("pair",wide);
+  if(wide){ d2.append(zone("inv"),zone("def")); d3.append(zone("inv"),zone("def")); }
+  else    { d2.append(zone("inv")); d3.append(zone("def")); }
+}
+window.addEventListener("resize",()=>{ if(S.screen===2||S.screen===3) render(); });
+
+function zone(sd){
+  const cls = "zone "+sd+(isVoidborn(sd)?" vb":"")+(isFallen(sd)?" fh":"");
+  const z=el("div",cls);
+  const total=["corvette","sentry","destroyer","dreadnought","carrier","voidborn"].reduce((a,k)=>a+S[sd][k],0);
+
+  const h=el("div","zhead");
+  h.append(el("span","badge", sd==="inv"?"Invader":"Defender"));
+  h.append(el("span","ctx", ctxText(sd)));
+  if(!isFallen(sd)) h.append(el("span","tot",`${total}<small>FP</small>`));
+  z.append(h);
+
+  if(isFallen(sd)){
+    z.append(el("div","fixedzone",
+      `<div class="big">2</div><span class="lbl">Sector Defenses</span>
+       <p>A Fallen House sector is fully determined: the two printed Sector Defenses each deal
+       1 Approach Damage. No Fleet Power, no Technologies, no Salvo steps — if the Invader survives
+       the Approach step, the Fallen House capitulates immediately.</p>`));
+    return z;
+  }
+
+  /* ---- Kacheln ---- */
+  const pods=el("div","pods");
+  const keys = isVoidborn(sd) ? ["voidborn"]
+             : Object.keys(FLEETS).filter(f=>PROFILES[S.profile[sd]].fleets.includes(f));
+  keys.forEach(k=>pods.append(pod(sd,k)));
+  if(sd==="def"){
+    pods.append(pod(sd,"sectorDefenses",{label:"Sector Def.",icon:"i-sd",color:"--sector-defense",max:6,cls:"inst"}));
+    if(isPlayer("def")) pods.append(pod(sd,"starbases",{label:"Starbase",icon:"i-starbase",color:"--starbase",max:2,cls:"inst sb"}));
+  }
+  z.append(pods);
+
+  if(!S[sd].touched){
+    z.append(el("div","hintline",
+      `<b>Tap</b> a fleet to add 1 · <b>swipe</b> across it to set any value · <b>hold</b> to clear`));
+  }
+
+  /* ---- Loadout ---- */
+  if(isPlayer(sd)){
+    const lo=el("div","loadout");
+    const active = Object.keys(TECH).filter(k=>{
+      const t=TECH[k];
+      if(t.side && t.side!==sd) return false;
+      if(t.needs && S[sd][t.needs]===0) return false;
+      if(k==="destroyers") return S[sd].destroyer>0;
+      return S[sd].tech[k]>0;
+    });
+    active.forEach(k=>lo.append(badge(sd,k)));
+    const more=el("button","badge2 more", (active.length? "＋ Tech" : "＋ Add Technologies"));
+    more.addEventListener("click",()=>openSheet(sd));
+    lo.append(more);
+    z.append(lo);
+  }
+  return z;
+}
+function ctxText(sd){
+  const t=S.combatType;
+  if(sd==="inv") return t==="skirmish"?"Voidborn · Skirmish":PROFILES[S.profile.inv].name;
+  if(t==="pvv") return "Voidborn";
+  if(t==="fallen") return "Fallen House";
+  return PROFILES[S.profile.def].name;
+}
+
+/* ---- Kachel mit Tap / Wisch / Halten -------------------------------------
+   Tap  = +1 · horizontales Ziehen = scrubben · 450 ms halten = 0            */
+function pod(sd,key,override){
+  const meta = override || (key==="voidborn"
+    ? {label:"Voidborn", icon:"i-voidborn", color:"--fleet-voidborn", max:MAXFP}
+    : {...FLEETS[key], max:MAXFP});
+  const v=S[sd][key];
+  const p=el("button","pod "+(meta.cls||"")+(v>0?" has":""),
+    `<svg class="ship" style="color:var(${meta.color})"><use href="#${meta.icon}"/></svg>
+     <span class="pv num">${v}</span>
+     <span class="pn">${meta.label}</span>
+     <span class="track"><i style="width:${Math.round(v/meta.max*100)}%"></i></span>`);
+  p.setAttribute("aria-label",`${meta.label}: ${v}. Tap to add one, swipe to set, hold to clear.`);
+
+  let x0=0, v0=0, moved=false, held=false, timer=null;
+  const setV=(n)=>{
+    n=Math.max(0,Math.min(meta.max,n));
+    if(n===S[sd][key]) return;
+    S[sd][key]=n; S[sd].touched=true;
+    p.querySelector(".pv").textContent=n;
+    p.querySelector(".track i").style.width=Math.round(n/meta.max*100)+"%";
+    p.classList.toggle("has",n>0);
+    bump();
+  };
+  p.addEventListener("pointerdown",e=>{
+    x0=e.clientX; v0=S[sd][key]; moved=false; held=false;
+    p.setPointerCapture(e.pointerId);
+    timer=setTimeout(()=>{ held=true; setV(0); hud(0); },450);
+  });
+  p.addEventListener("pointermove",e=>{
+    if(held) return;
+    const dx=e.clientX-x0;
+    if(Math.abs(dx)>12){
+      if(!moved){ moved=true; clearTimeout(timer); p.classList.add("scrub"); }
+      const n=Math.max(0,Math.min(meta.max, v0+Math.round(dx/18)));
+      setV(n); hud(n);
+    }
+  });
+  const end=()=>{
+    clearTimeout(timer); p.classList.remove("scrub"); hideHud();
+    if(!moved && !held) setV(S[sd][key]+1 > meta.max ? 0 : S[sd][key]+1);
+    render();
+  };
+  p.addEventListener("pointerup",end);
+  p.addEventListener("pointercancel",()=>{clearTimeout(timer);p.classList.remove("scrub");hideHud();});
+  return p;
+}
+let hudT=null;
+function hud(n){ const h=$("#hud"); h.textContent=n; h.classList.add("on"); clearTimeout(hudT); }
+function hideHud(){ hudT=setTimeout(()=>$("#hud").classList.remove("on"),160); }
+
+/* ---- Loadout-Badge: ein Tap wechselt die Stufe --------------------------- */
+function badge(sd,key){
+  const t=TECH[key], v=S[sd].tech[key];
+  const usable = t.states.map((s,i)=>s===null?null:i).filter(i=>i!==null);
+  const label = t.states[v] || t.states[usable[0]];
+  const dead = t.corvette && S[sd].corvette===0;
+  const b=el("button","badge2"+(dead?" dead":""),
+    `<span>${t.label}</span><span class="st">${label}</span>`);
+  b.dataset.s=v;
+  b.setAttribute("aria-label",`${t.label}: ${label}. Tap to change level.`);
+  b.addEventListener("click",()=>{
+    const i=usable.indexOf(v);
+    S[sd].tech[key]= usable[(i+1)%usable.length];
+    render(); bump();
+  });
+  return b;
+}
+
+/* ===== Bottom-Sheet ====================================================== */
+let sheetSide=null;
+function openSheet(sd){
+  sheetSide=sd;
+  $("#sheetTitle").textContent = (sd==="inv"?"Invader":"Defender")+" — Technologies";
+  const body=$("#sheetBody"); body.innerHTML="";
+  Object.keys(TECH).forEach(k=>{
+    const t=TECH[k];
+    if(t.side && t.side!==sd) return;
+    if(t.needs && S[sd][t.needs]===0) return;
+    const r=el("div","trow");
+    r.append(el("span","tn",`${t.label}<small>${t.note}</small>`));
+    const tri=el("div","tri");
+    t.states.forEach((label,i)=>{
+      if(label===null) return;
+      const b=el("button",null,label);
+      b.dataset.v=i; b.setAttribute("aria-pressed",String(S[sd].tech[k]===i));
+      b.setAttribute("aria-label",`${t.label}: ${label}`);
+      b.addEventListener("click",()=>{ S[sd].tech[k]=i; openSheet(sd); render(); bump(); });
+      tri.append(b);
+    });
+    r.append(tri); body.append(r);
+  });
+
+  /* Advanced im selben Sheet */
+  if(S[sd].tech.dsm>0){
+    const f=el("div","field");
+    f.append(el("span","lbl","Adjacent sectors with a Shipyard or Starbase"));
+    const seg=el("div","seg");
+    [0,1,2].forEach(n=>{const x=el("button",null,n===2?"2+":String(n));
+      x.setAttribute("aria-pressed",String(S[sd].adjacent===n));
+      x.addEventListener("click",()=>{S[sd].adjacent=n;openSheet(sd);bump();});seg.append(x);});
+    f.append(seg);
+    f.append(el("p","expl","The only value that needs a look at the map instead of your own board. Capped at 2."));
+    body.append(f);
+  }
+  if(sd==="inv"&&S.inv.tech.dsm===1&&S.inv.adjacent>0) body.append(sw(sd,"spendEnergy","Spend 1 Energy for Basic Deep Space Missiles"));
+  if(sd==="inv"&&S.inv.tech.drones>0) body.append(sw(sd,"returnTrade","Return a Trade token to use Autonomous Drones"));
+  if(sd==="inv"){
+    const f=el("div","field");
+    f.append(el("span","lbl","Bombard — Materials spent (Uplift Focus)"));
+    const seg=el("div","seg");
+    [0,3,6,9].forEach(n=>{const x=el("button",null,String(n));
+      x.setAttribute("aria-pressed",String(S.inv.bombard===n));
+      x.addEventListener("click",()=>{S.inv.bombard=n;openSheet(sd);bump();});seg.append(x);});
+    f.append(seg);
+    f.append(el("p","expl","Each 3 Materials grant 1 Approach or Salvo Absorption; the resolver picks the better split."));
+    body.append(f);
+  }
+  $("#scrim").classList.add("on"); $("#sheet").classList.add("on");
+}
+function sw(sd,key,label){
+  const t=el("button","switch",`<span class="tr"></span><span class="sl">${label}</span>`);
+  t.setAttribute("aria-pressed",String(!!S[sd][key]));
+  t.addEventListener("click",()=>{S[sd][key]=!S[sd][key];openSheet(sd);bump();});
+  return t;
+}
+function closeSheet(){ $("#scrim").classList.remove("on"); $("#sheet").classList.remove("on"); render(); }
+$("#scrim").addEventListener("click",closeSheet);
+$("#sheetClose").addEventListener("click",closeSheet);
+
+/* ===== Floating-Kurzergebnis (Platzhalter, KEIN Resolver) ================ */
+function bump(){
+  const sum=s=>["corvette","sentry","destroyer","dreadnought","carrier","voidborn"].reduce((a,k)=>a+S[s][k],0);
+  const i=sum("inv"), d=sum("def");
+  const who=$("#miniWho"), fp=$("#miniFp");
+  who.className="who";
+  if(!S.combatType||(i===0&&d===0)){ who.classList.add("na"); who.textContent="—"; fp.textContent="–"; }
+  else if(i>d){ who.classList.add("inv"); who.textContent="Invader"; fp.textContent=i-d; }
+  else if(d>i){ who.classList.add("def"); who.textContent="Defender"; fp.textContent=d-i; }
+  else { who.classList.add("tie"); who.textContent="Tie"; fp.textContent="0"; }
+  const m=$("#mini"); m.classList.remove("pulse"); void m.offsetWidth; m.classList.add("pulse");
+}
+
+go(1); bump();
+</script>
+</body>

@@ -1,0 +1,5 @@
+# Nicht-öffentliches Material (Voidfall-Regeltexte, PDFs, interner Cache-Index)
+/Private/
+
+# Claude Code lokale Konfiguration
+/.claude/
